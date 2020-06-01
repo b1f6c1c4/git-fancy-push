@@ -5,13 +5,27 @@
 
 ## TL;DR
 
+:worried: :frowning: :anguished:
+Ever seen this is your life? Got annoyed?
+:anguished: :frowning: :worried:
+
+And you don't want to download the 100GiB commit history for doing a simple push?
+```bash
+git push origin master
+## To github.com:b1f6c1c4/----.git
+##  ! [remote rejected] master -> master (shallow update not allowed)
+## error: failed to push some refs to 'git@github.com:b1f6c1c4/----.git'
+```
+
+:wink: :kissing_smiling_eyes: :stuck_out_tongue:
+Here is your solution!
+:stuck_out_tongue: :kissing_smiling_eyes: :wink:
 ```bash
 # Get the code!
-git get -o ~/.local/bin/ b1f6c1c4/git-fancy-push -- git-fancy-push
-# Go push!
+mkdir -p ~/.local/bin/ && wget -o ~/.local/bin/git-fancy-push https://raw.githubusercontent.com/b1f6c1c4/git-fancy-push/master/git-fancy-push
+which git-fancy-push || export PATH="$HOME/.local/bin:$PATH"
+# Do the push!
 git fancy-push [<options>] [<remote>] [<refspec>...]
-# Optionally, use fancy-push by default!
-git config --global alias.push fancy-push
 ```
 
 ## Usage
