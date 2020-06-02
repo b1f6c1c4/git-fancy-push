@@ -2,6 +2,26 @@
 
 set -euo pipefail
 
+VERBOSE=
+if [ "$#" -gt 0 ] && [ "$1" = "--execute" ]; then
+    commit_to_json() {
+        git cat-file commit "$SHA1" | awk '
+        ' | jq "$(git cat-file commit "$SHA1" | awk '')"
+    }
+
+    shift
+    [ "$1" = "--verbose" ] && VERBOSE=YES && shift
+    [ -n "$VERBOSE" ] && printf 'args: %q\n' "$@" >&2
+    GH="$1"
+    URL="$2"
+    REF="$3"
+    SHA1="$4"
+    TOKEN="$(cat ~/.hub-sync)" # FIXME: token
+
+    if curl -fs -o /dev/null "https://api.github.com/repos/$GH/git/trees/$T" -H "Authorization: token $TOKEN"
+    exit 0
+fi
+
 look_for() {
     T="$1"
     shift
@@ -12,80 +32,55 @@ look_for() {
     return 1
 }
 
-# Perform some basic sanity check
-G="$(git rev-parse --git-dir)"
-[ -z "$G" ] && exit 3
-[ -d "$G" ] || exit 3
-which curl >/dev/null || exit 3
-HP="$(git config --get core.hooksPath || printf '%s/hooks' "$G")"
-[ -z "$G" ] && exit 3
-H="$HP/pre-push"
+(look_for "-v" "$@" || look_for "--verbose" "$@") && VERBOSE=YES
 
-# Acquire lock
-LCK="$H.git-fancy-push.lock"
-if ! { set -C; true 2>/dev/null >"$LCK"; }; then
-    echo 'Error: Another git-fancy-push in progress.' >&2
-    printf "If you think that's a mistake, remove this file: %s\\n" "$LCK" >&2
-    exit 2
-fi
-finish_1() {
-    rm -f "$LCK"
-}
-trap finish_1 EXIT
-
-# Make temp file
-TREFS="$(mktemp)"
-finish_1() {
-    rm -f "$TREFS" "$LCK"
-}
-
-# Backup the old hook script
-if [ -e "$H" ]; then
-    OLD_HOOK="$H.bak"
-    while [ -e "$OLD_HOOK" ]; do
-        OLD_HOOK="$OLD_HOOK.bak"
-    done
-    finish_1() {
-        [ -e "$OLD_HOOK" ] && mv -f "$OLD_HOOK" "$H"
-        rm -f "$TREFS" "$LCK"
-    }
-    mv -n "$HP/pre-push" "$OLD_HOOK"
-    [ -x "$OLD_HOOK" ] && printf 'OLD_HOOK=%q\n' "$OLD_HOOK" >"$H"
-else
-    finish_1() {
-        rm -f "$H" "$TREFS""$LCK"
-    }
-    printf 'OLD_HOOK=\n' >"$H"
-fi
-printf 'TREFS=%q\n' "$TREFS" >>"$H"
-
-# Write the hook script
-cat - <<EOF >>"$H"
-printf '>>>>> %s\\n' "\$@" >>"\$TREFS"
-if [ -z "\$OLD_HOOK" ]; then
-    tee -a "\$TREFS" | "\$OLD_HOOK" "$@"
-    exit "$?"
-else
-    tee -a "\$TREFS" >/dev/null
-    exit 0
-fi
-EOF
-chmod +x "$H"
-(look_for "-v" "$@" || look_for "--verbose" "$@") && cat "$H" >&2
-
-# Now, we are ready, run git push
+# Run git push
 TLOG="$(mktemp)"
 finish_2() {
-    finish_1
     rm -f "$TLOG"
 }
 trap finish_2 EXIT
+set +e
 git push --porcelain "$@" | tee "$TLOG"
 R="$?"
+set -e
 
 # Check if no shallow update
-grep -q ' \[remote rejected\] (shallow update not allowed)$' || exit "$R"
+grep -q '\s\[remote rejected\] (shallow update not allowed)$' "$TLOG" || exit "$R"
 
-# printf 'oh:   %q\\n' "\$OLD_HOOK"
-# printf 'pwd:  %q\\n' "\$(pwd)"
-# printf 'args: %q\\n' "\$@"
+awk '
+    /^To/ { gh=""; u=""; }
+
+    /^To github.com:/ {
+        gh=$2;
+        sub(/^github.com:/, "", gh);
+        sub(/.git$/, "", gh);
+        u="git@github.com:" gh ".git";
+    }
+
+    /^To https:\/\/github.com\// {
+        gh=$2;
+        sub(/https:\/\/github.com\//, "", gh);
+        sub(/.git$/, "", gh);
+        u="https://github.com/" gh ".git";
+    }
+
+    /^!\s\S+:\S+\s\[remote rejected\] \(shallow update not allowed\)$/ {
+        if (gh != "") {
+            s=$2; sub(/:.*$/, "", s);
+            t=$2; sub(/^.*:/, "", t);
+            printf "%s %s %s ", gh, u, t;
+            if (system("git rev-parse " s) != 0) {
+                exit 1;
+            }
+        } else {
+            # TODO
+        }
+    }
+' "$TLOG" | (
+if [ -n "$VERBOSE" ]; then
+    tee /dev/stderr | xargs -L 1 "$0" --execute --verbose
+else
+    xargs -L 1 "$0" --execute
+fi
+)

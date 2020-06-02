@@ -21,8 +21,13 @@ git push origin master
 Here is your solution!
 :stuck_out_tongue: :kissing_smiling_eyes: :wink:
 ```bash
-# Get the code!
-mkdir -p ~/.local/bin/ && wget -o ~/.local/bin/git-fancy-push https://raw.githubusercontent.com/b1f6c1c4/git-fancy-push/master/git-fancy-push
+# Get jq!
+(which pacman  && sudo pacman  -S      jq) ||
+(which apt-get && sudo apt-get install jq) ||
+(which brew    &&      brew    install jq)
+which jq
+# Get git-fancy-push!
+mkdir -p ~/.local/bin/ && curl -o ~/.local/bin/git-fancy-push https://raw.githubusercontent.com/b1f6c1c4/git-fancy-push/master/git-fancy-push
 which git-fancy-push || export PATH="$HOME/.local/bin:$PATH"
 # Do the push!
 git fancy-push origin master
@@ -31,13 +36,15 @@ git fancy-push origin master
 ## Usage
 
 The CLI is 100% compatible with that of `git push`.
+You just replace `git push` with `git fancy-push`.
 
 ## Dependency
 
+- `jq` - [here](https://stedolan.github.io/jq/)
 - `bash`
 - `git`
 - `curl`
-- `awk`
+- `gawk`
 
 ## Limitation
 
