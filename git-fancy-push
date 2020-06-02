@@ -8,6 +8,14 @@ fi
 
 set -euo pipefail
 
+peek() {
+    if [ -n "$VERBOSE" ]; then
+        tee /dev/stderr
+    else
+        cat -
+    fi
+}
+
 if [ "$#" -gt 0 ] && [ "$1" = "--update-ref" ]; then
     shift
     [ -n "$VERBOSE" ] && printf '%q' "$0" >&2
@@ -17,33 +25,43 @@ if [ "$#" -gt 0 ] && [ "$1" = "--update-ref" ]; then
     URL="$2"
     REF="$3"
     SHA1="$4"
+    if [ "$GH" = "--" ]; then
+        printf 'Error: \e[31mWe are so sorry that we only support GitHub.\e[0m\n' >&2
+        printf 'Error: If you wish, you can open an issue on https://github.com/b1f6c1c4/git-fancy-push/issues.' >&2
+        printf 'Notice: \e[33mSkipped git fancy-push %s %s:%s\e[0m\n' "$URL" "$SHA1" "$REF" >&2
+        exit 0
+    fi
     "$0" --upload-commit "$GH" "$URL" "$SHA1"
     if jq -n '{ ref: $ref, sha: $sha }' \
         --arg ref "$REF" \
         --arg sha "$SHA1" \
-        | ([ -n "$VERBOSE" ] && tee /dev/stderr) \
-        | curl -fs "https://api.github.com/repos/$GH/git/refs"; then
-        printf 'Notice: \e[32mPush (creation) successful!\e[0m %s is now at %s on %s.\n' "$REF" "$SHA1" "$URL" >&2
+        | peek \
+        | curl -fs -o /dev/null "https://api.github.com/repos/$GH/git/refs"; then
+        printf 'Notice: \e[32mPush (creation) successful!\e[0m (to %s)\n' "$URL" >&2
+        printf 'Notice: %s is now at %s.\n' "$REF" "$SHA1" >&2
         printf 'Notice: Please git fetch by yourself.\n' >&2
         exit 0
     fi
     PREV="$(curl -fsS "https://api.github.com/repos/$GH/git/$REF" | jq -r '.object.sha')"
     if jq -n '{ force: false, sha: $sha }' \
         --arg sha "$SHA1" \
-        | ([ -n "$VERBOSE" ] && tee /dev/stderr) \
+        | peek \
         | curl -fs -X PATCH "https://api.github.com/repos/$GH/git/$REF" \
-        | ([ -n "$VERBOSE" ] && tee /dev/stderr); then
-        printf 'Notice: \e[32mPush successful!\e[0m %s is now at %s on %s.\n' "$REF" "$SHA1" "$URL" >&2
+        | peek >/dev/null; then
+        printf 'Notice: \e[32mPush successful!\e[0m (to %s)\n' "$URL" >&2
+        printf 'Notice: %s is now at %s.\n' "$REF" "$SHA1" >&2
         printf 'Notice: %s was previously at %s.\n' "$REF" "$PREV" >&2
         printf 'Notice: Please git fetch by yourself.\n' >&2
         exit 0
     fi
+    printf 'Warning: \e[33mDoing forced push on %s\e[0m\n' "$REF" >&2
     if jq -n '{ force: true, sha: $sha }' \
         --arg sha "$SHA1" \
-        | ([ -n "$VERBOSE" ] && tee /dev/stderr) \
+        | peek \
         | curl -fs -X PATCH "https://api.github.com/repos/$GH/git/$REF" \
-        | ([ -n "$VERBOSE" ] && tee /dev/stderr); then
-        printf 'Notice: \e[32mForce push successful!\e[0m %s is now at %s on %s.\n' "$REF" "$SHA1" "$URL" >&2
+        | peek >/dev/null; then
+        printf 'Notice: \e[32mForced push successful!\e[0m (to %s)\n' "$URL" >&2
+        printf 'Notice: %s is now at %s.\n' "$REF" "$SHA1" >&2
         printf 'Notice: %s was previously at %s.\n' "$REF" "$PREV" >&2
         printf 'Notice: Please git fetch by yourself.\n' >&2
         exit 0
@@ -65,13 +83,8 @@ if [ "$#" -gt 0 ] && [ "$1" = "--upload-commit" ]; then
         exit 0
     fi
     [ -n "$VERBOSE" ] && printf 'Info: Commit %s non-existant, will upload later.\n' "$SHA1" >&2
-    git show -s --format="%P" "$SHA1" | (
-    if [ -n "$VERBOSE" ]; then
-        xargs -r -n 1 "$0" --upload-commit --verbose "$GH" "$URL"
-    else
-        xargs -r -n 1 "$0" --upload-commit --verbose "$GH" "$URL"
-    fi
-    )
+    git show -s --format="%P" "$SHA1" \
+        | xargs -r -n 1 "$0" --upload-commit "$GH" "$URL"
     TREE="$(git rev-parse "$SHA1^{tree}")"
     if ! curl -fs -o /dev/null "https://api.github.com/repos/$GH/git/trees/$TREE" -H "Authorization: token $TOKEN"; then
         [ -n "$VERBOSE" ] && printf 'Info: Uploading tree %s.\n' "$TREE" >&2
@@ -116,9 +129,9 @@ if [ "$#" -gt 0 ] && [ "$1" = "--upload-commit" ]; then
                     { if (a) print $0; }
                 ')" \
             --args $(git show -s --format="%P" "$SHA1") \
-        | ([ -n "$VERBOSE" ] && tee /dev/stderr) \
+        | peek \
         | curl -fsS -d @- -X POST "https://api.github.com/repos/$GH/git/commits" -H "Authorization: token $TOKEN" \
-        | ([ -n "$VERBOSE" ] && tee /dev/stderr) \
+        | peek \
         | jq -r '.sha' | (
             read -r sh;
             if ! [ "$SHA1" = "$sh" ]; then
@@ -157,10 +170,10 @@ set -e
 # Check if no shallow update
 grep -q '\s\[remote rejected\] (shallow update not allowed)$' "$TLOG" || exit "$R"
 
-printf 'Notice: \e[35mKeep Calm! git-fancy-push has started to address this problem.\e[0m' >&2
+printf 'Notice: \e[35mKeep Calm!\e[0m \e[36mgit-fancy-push\e[0m is working on it.\n' >&2
 
 awk '
-    /^To/ { gh=""; u=""; }
+    /^To / { gh="--"; u=$2; }
 
     /^To github.com:/ {
         gh=$2;
@@ -177,19 +190,16 @@ awk '
     }
 
     /^!\s\S+:\S+\s\[remote rejected\] \(shallow update not allowed\)$/ {
-        if (gh != "") {
-            s=$2; sub(/:.*$/, "", s);
-            t=$2; sub(/^.*:/, "", t);
-            printf "%s %s %s ", gh, u, t;
-            if (system("git rev-parse " s) != 0) {
-                exit 1;
-            }
-        } else {
-            # TODO
+        s=$2; sub(/:.*$/, "", s);
+        t=$2; sub(/^.*:/, "", t);
+        printf "%s %s %s ", gh, u, t;
+        if (system("git rev-parse " s) != 0) {
+            exit 1;
         }
     }
 ' "$TLOG" \
-    | ([ -n "$VERBOSE" ] && tee /dev/stderr) \
+    | peek \
     | xargs -r -L 1 "$0" --update-ref
 
-printf 'Notice: \e[35mAll shallow-update-not-allowed problem fixed!\e[0m' >&2
+printf 'Notice: \e[35mAll shallow-update-not-allowed problem(s) has been fixed!\e[0m\n' >&2
+printf 'Notice: Thanks for using \e[36mgit-fancy-push\e[0m.\n' >&2

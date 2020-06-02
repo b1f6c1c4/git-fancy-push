@@ -31,12 +31,17 @@ mkdir -p ~/.local/bin/ && curl -o ~/.local/bin/git-fancy-push https://raw.github
 which git-fancy-push || export PATH="$HOME/.local/bin:$PATH"
 # Do the push!
 git fancy-push origin master
+## ...
+## Notice: Push successful! (to ...)
+## ...
 ```
 
 ## Usage
 
 The CLI is 100% compatible with that of `git push`.
 You just replace `git push` with `git fancy-push`.
+It will start running automatically once you encounter
+a "shallow update not allowed" problem.
 
 ## Dependency
 
@@ -44,12 +49,12 @@ You just replace `git push` with `git fancy-push`.
 - `bash`
 - `git`
 - `curl`
-- `gawk`
+- `awk`
 
 ## Limitation
 
 It will only work for GitHub.
-If you want support for other platforms, create issues or pull requests.
+If you want support for other platforms, create an issue or pull request.
 
 ## License
 
