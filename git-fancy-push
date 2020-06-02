@@ -8,7 +8,14 @@ fi
 
 set -euo pipefail
 
-TOKEN="$(cat ~/.hub-sync)" # FIXME: token
+if [ -r ~/.git-fancy-push ]; then
+    TOKEN="$(cat ~/.hub-sync)"
+else
+    printf 'Error: \e[36mgit-fancy-push\e[0m needs a GitHub token to run!\n' >&2
+    printf 'Error: Please put your GitHub personal access token to \e[33m~/.git-fancy-push\e[0m\n' >&2
+    printf 'Error: You can get one from here: \e[35mhttps://github.com/settings/tokens\e[0m\n' >&2
+    exit 1
+fi
 
 peek() {
     if [ -n "$VERBOSE" ]; then
