@@ -1,0 +1,91 @@
+#!/bin/bash
+
+set -euo pipefail
+
+look_for() {
+    T="$1"
+    shift
+    while [ "$#" -gt 0 ]; do
+        [ "$1" = "$T" ] && return 0
+        shift
+    done
+    return 1
+}
+
+# Perform some basic sanity check
+G="$(git rev-parse --git-dir)"
+[ -z "$G" ] && exit 3
+[ -d "$G" ] || exit 3
+which curl >/dev/null || exit 3
+HP="$(git config --get core.hooksPath || printf '%s/hooks' "$G")"
+[ -z "$G" ] && exit 3
+H="$HP/pre-push"
+
+# Acquire lock
+LCK="$H.git-fancy-push.lock"
+if ! { set -C; true 2>/dev/null >"$LCK"; }; then
+    echo 'Error: Another git-fancy-push in progress.' >&2
+    printf "If you think that's a mistake, remove this file: %s\\n" "$LCK" >&2
+    exit 2
+fi
+finish_1() {
+    rm -f "$LCK"
+}
+trap finish_1 EXIT
+
+# Make temp file
+TREFS="$(mktemp)"
+finish_1() {
+    rm -f "$TREFS" "$LCK"
+}
+
+# Backup the old hook script
+if [ -e "$H" ]; then
+    OLD_HOOK="$H.bak"
+    while [ -e "$OLD_HOOK" ]; do
+        OLD_HOOK="$OLD_HOOK.bak"
+    done
+    finish_1() {
+        [ -e "$OLD_HOOK" ] && mv -f "$OLD_HOOK" "$H"
+        rm -f "$TREFS" "$LCK"
+    }
+    mv -n "$HP/pre-push" "$OLD_HOOK"
+    [ -x "$OLD_HOOK" ] && printf 'OLD_HOOK=%q\n' "$OLD_HOOK" >"$H"
+else
+    finish_1() {
+        rm -f "$H" "$TREFS""$LCK"
+    }
+    printf 'OLD_HOOK=\n' >"$H"
+fi
+printf 'TREFS=%q\n' "$TREFS" >>"$H"
+
+# Write the hook script
+cat - <<EOF >>"$H"
+printf '>>>>> %s\\n' "\$@" >>"\$TREFS"
+if [ -z "\$OLD_HOOK" ]; then
+    tee -a "\$TREFS" | "\$OLD_HOOK" "$@"
+    exit "$?"
+else
+    tee -a "\$TREFS" >/dev/null
+    exit 0
+fi
+EOF
+chmod +x "$H"
+(look_for "-v" "$@" || look_for "--verbose" "$@") && cat "$H" >&2
+
+# Now, we are ready, run git push
+TLOG="$(mktemp)"
+finish_2() {
+    finish_1
+    rm -f "$TLOG"
+}
+trap finish_2 EXIT
+git push --porcelain "$@" | tee "$TLOG"
+R="$?"
+
+# Check if no shallow update
+grep -q ' \[remote rejected\] (shallow update not allowed)$' || exit "$R"
+
+# printf 'oh:   %q\\n' "\$OLD_HOOK"
+# printf 'pwd:  %q\\n' "\$(pwd)"
+# printf 'args: %q\\n' "\$@"

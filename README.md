@@ -12,9 +12,9 @@ Ever seen this is your life? Got annoyed?
 And you don't want to download the 100GiB commit history for doing a simple push?
 ```bash
 git push origin master
-## To github.com:b1f6c1c4/----.git
+## To github.com:...
 ##  ! [remote rejected] master -> master (shallow update not allowed)
-## error: failed to push some refs to 'git@github.com:b1f6c1c4/----.git'
+## error: failed to push some refs to 'git@github.com:...
 ```
 
 :wink: :kissing_smiling_eyes: :stuck_out_tongue:
@@ -25,7 +25,7 @@ Here is your solution!
 mkdir -p ~/.local/bin/ && wget -o ~/.local/bin/git-fancy-push https://raw.githubusercontent.com/b1f6c1c4/git-fancy-push/master/git-fancy-push
 which git-fancy-push || export PATH="$HOME/.local/bin:$PATH"
 # Do the push!
-git fancy-push [<options>] [<remote>] [<refspec>...]
+git fancy-push origin master
 ```
 
 ## Usage
@@ -37,6 +37,7 @@ The CLI is 100% compatible with that of `git push`.
 - `bash`
 - `git`
 - `curl`
+- `awk`
 
 ## Limitation
 
