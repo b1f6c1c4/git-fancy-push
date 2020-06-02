@@ -1,11 +1,15 @@
 #!/bin/bash
 
+if [ -z "$VERBOSE" ]; then
+    VERBOSE=
+else
+    VERBOSE=YES
+fi
+
 set -euo pipefail
 
-VERBOSE=
 if [ "$#" -gt 0 ] && [ "$1" = "--update-ref" ]; then
     shift
-    [ "$1" = "--verbose" ] && VERBOSE=YES && shift
     [ -n "$VERBOSE" ] && printf '%q' "$0" >&2
     [ -n "$VERBOSE" ] && printf ' %q' "$@" >&2
     [ -n "$VERBOSE" ] && printf '\n' >&2
@@ -13,7 +17,7 @@ if [ "$#" -gt 0 ] && [ "$1" = "--update-ref" ]; then
     URL="$2"
     REF="$3"
     SHA1="$4"
-    "$0" --upload-commit --verbose "$GH" "$URL" "$SHA1" # FIXME: verbose
+    "$0" --upload-commit "$GH" "$URL" "$SHA1"
     if jq -n '{ ref: $ref, sha: $sha }' \
         --arg ref "$REF" \
         --arg sha "$SHA1" \
@@ -46,9 +50,9 @@ if [ "$#" -gt 0 ] && [ "$1" = "--update-ref" ]; then
     fi
     exit 0
 fi
+
 if [ "$#" -gt 0 ] && [ "$1" = "--upload-commit" ]; then
     shift
-    [ "$1" = "--verbose" ] && VERBOSE=YES && shift
     [ -n "$VERBOSE" ] && printf '%q' "$0" >&2
     [ -n "$VERBOSE" ] && printf ' %q' "$@" >&2
     [ -n "$VERBOSE" ] && printf '\n' >&2
@@ -56,7 +60,6 @@ if [ "$#" -gt 0 ] && [ "$1" = "--upload-commit" ]; then
     URL="$2"
     SHA1="$3"
     TOKEN="$(cat ~/.hub-sync)" # FIXME: token
-
     if curl -fs -o /dev/null "https://api.github.com/repos/$GH/git/commits/$SHA1" -H "Authorization: token $TOKEN"; then
         printf 'Notice: \e[33mCommit %s is already on GitHub.\e[0m\n' "$SHA1" >&2
         exit 0
@@ -138,7 +141,7 @@ look_for() {
     return 1
 }
 
-(look_for "-v" "$@" || look_for "--verbose" "$@") && VERBOSE=YES
+(look_for "-v" "$@" || look_for "--verbose" "$@") && export VERBOSE=YES
 
 # Run git push
 TLOG="$(mktemp)"
@@ -154,7 +157,7 @@ set -e
 # Check if no shallow update
 grep -q '\s\[remote rejected\] (shallow update not allowed)$' "$TLOG" || exit "$R"
 
-printf 'Notice: \e[32mKeep Calm! git-fancy-push has started to address this problem.\e[0m' >&2
+printf 'Notice: \e[35mKeep Calm! git-fancy-push has started to address this problem.\e[0m' >&2
 
 awk '
     /^To/ { gh=""; u=""; }
@@ -185,10 +188,8 @@ awk '
             # TODO
         }
     }
-' "$TLOG" | (
-if [ -n "$VERBOSE" ]; then
-    tee /dev/stderr | xargs -r -L 1 "$0" --update-ref --verbose
-else
-    xargs -r -L 1 "$0" --update-ref
-fi
-)
+' "$TLOG" \
+    | ([ -n "$VERBOSE" ] && tee /dev/stderr) \
+    | xargs -r -L 1 "$0" --update-ref
+
+printf 'Notice: \e[35mAll shallow-update-not-allowed problem fixed!\e[0m' >&2
