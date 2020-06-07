@@ -1,13 +1,13 @@
-git clone --bare --depth=1 --branch example-repo1 https://github.com/b1f6c1c4/git-get repo
+git clone --depth=1 --branch example-repo1 https://github.com/b1f6c1c4/git-get repo
 cd repo
 git config credential.helper 'store --file ../.credentials'
 
 git remote add another https://github.com/b1f6c1c4/git-fancy-push
 
-! git push another example-repo1:ci-test
+! git push another "example-repo1:$TMP_BR"
 
-git fancy-push another example-repo1:ci-test
+git fancy-push another "example-repo1:$TMP_BR"
 
-[ -n "$(git ls-remote another refs/heads/ci-test)" ]
+[ -n "$(git ls-remote another "$TMP_BR")" ]
 
-git push --delete another ci-test
+git push --delete another "$TMP_BR"

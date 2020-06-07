@@ -9,7 +9,7 @@ fi
 set -euo pipefail
 
 if [ -r ~/.git-fancy-push ]; then
-    TOKEN="$(cat ~/.hub-sync)"
+    TOKEN="$(cat ~/.git-fancy-push)"
 else
     printf 'Error: \e[36mgit-fancy-push\e[0m needs a GitHub token to run!\n' >&2
     printf 'Error: Please put your GitHub personal access token to \e[33m~/.git-fancy-push\e[0m\n' >&2

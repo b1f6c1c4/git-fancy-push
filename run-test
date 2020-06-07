@@ -14,6 +14,9 @@ finish() {
 }
 trap finish EXIT
 
+TMP_BR="$(basename "$FILE")"
+TMP_BR="refs/heads/ci-test-${TMP_BR%.test}"
+
 git credential-store --file "$WORK_DIR/.credentials" store <<EOF
 protocol=https
 host=github.com
