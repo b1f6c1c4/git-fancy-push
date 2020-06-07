@@ -1,0 +1,26 @@
+#!/bin/bash
+
+set -euo pipefail
+
+FILE="$(realpath "$1")"
+
+export GH_USE_HTTPS=YES
+export PATH="$(realpath "$(dirname "$0")"):$PATH"
+
+WORK_DIR="$(realpath "$(mktemp -d)")"
+finish() {
+    cd /
+    rm -rf "$WORK_DIR"
+}
+trap finish EXIT
+
+git credential-store --file "$WORK_DIR/.credentials" store <<EOF
+protocol=https
+host=github.com
+username=b1f6c1c4
+password=$GH_TOKEN
+EOF
+
+cd "$WORK_DIR"
+set -euxo pipefail
+source "$FILE"

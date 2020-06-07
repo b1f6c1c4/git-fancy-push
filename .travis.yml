@@ -1,0 +1,31 @@
+language: bash
+jobs:
+  include:
+    - os: linux
+      dist: bionic
+    - os: osx
+      osx_image: xcode11.4
+
+branches:
+  only:
+    - master
+
+env:
+  global:
+    - MAKEFLAGS="-j8"
+
+after_install:
+  - make clean
+
+before_script:
+  - git version
+
+script:
+  - make test
+
+notifications:
+  email: false
+
+env:
+  global:
+    secure: rRRYvrrvSXss1wvjQS7QXeaYSxsOEW5brDiayYGRe/2LsnKEexuwoDv0VdUJugEupZD688tmrLvI0RflBwF+kNe2JaVBD4IaKU29tvjhXy0o5VK1Dw7m0tFJkiYbcgIzU9CfeQEYiDQllxrf/eW0IwSUP2ty9a8ryaZNJjMhbPr8cJVOucg4zbfKvTndKv7sc86j3PFD0q82V5isz7dSfFOGEPS/yWFjuXOZO8a6yA+Q6yXRvSVL66ZP2HZUzhJ+2DOpsvAG/PxJ8z4aGZ0k23HxoDpQE/hwKd2RzGJh07e7gDHhI7P7Jq+WxryxWkEvNtreIg+zu0cX1SPmUzSKAYbgPESYjiyGVBAmVYJi1HR/FnQxMuuEafC7VxMJihZl8m4MsL/Zdmzr/R2cj8u2xKfN+lwPA3ky0OGzTIQRuLdo6kAP1RLdHurdBadSm8j0w5QO8nyT+DOhVaVHLm6CJ1cOk8tR99BgLFXFOyYIY6PUOmz5cZop8CKYCCV5Lq4j6PF1MNKmI0eKKCaOy+JxxvmoOS9zFwbl6PV5yTA2A3rW5NB3PQVFtYPfNe1xblhtX086OLkMBM8gccaIp9URbqYIxdegzkVtVX4BhO5ik7UY8Hu6jwtJfwZFwyY7Vj4H1SgBCDbQN8qw4PcevuVp+VyZ8qjrNV1KPPTs+iPHC/k=
